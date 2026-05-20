@@ -1,0 +1,6 @@
+node_modules/
+meal.db
+meal.db-shm
+meal.db-wal
+uploads/*
+!uploads/.gitkeep
