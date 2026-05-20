@@ -62,6 +62,14 @@ router.put('/:id', upload.single('image'), (req, res) => {
   res.json({ ok: true });
 });
 
+// POST /api/dishes/:id/image — 上传/更新图片
+router.post('/:id/image', upload.single('image'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: '没有图片' });
+  const image = `/uploads/${req.file.filename}`;
+  db.prepare('UPDATE dishes SET image = ? WHERE id = ?').run(image, req.params.id);
+  res.json({ ok: true, image });
+});
+
 // DELETE /api/dishes/:id
 router.delete('/:id', (req, res) => {
   db.prepare('DELETE FROM dishes WHERE id = ?').run(req.params.id);
