@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const router = express.Router();
 
 // 密码从环境变量读取，默认 5201314
-const PASSWORD = process.env.APP_PASSWORD || '5201314';
+const PASSWORD = process.env.APP_PASSWORD || '001024';
 
 // 简单 token 生成（密码的 sha256）
 function generateToken(password) {
