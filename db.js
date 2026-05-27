@@ -30,7 +30,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS order_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-    dish_id INTEGER NOT NULL REFERENCES dishes(id),
+    dish_id INTEGER NOT NULL REFERENCES dishes(id) ON DELETE CASCADE,
     quantity INTEGER DEFAULT 1
   );
 `);
