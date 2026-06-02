@@ -74,6 +74,20 @@ router.put('/:id/reply', (req, res) => {
   }
 });
 
+// PUT /api/orders/:id/user-reply — 女友回复
+router.put('/:id/user-reply', (req, res) => {
+  try {
+    const { user_reply } = req.body;
+    if (!user_reply || !user_reply.trim()) return res.status(400).json({ error: '回复内容不能为空' });
+    const info = db.prepare('UPDATE orders SET user_reply = ? WHERE id = ?')
+      .run(user_reply.trim(), req.params.id);
+    if (info.changes === 0) return res.status(404).json({ error: '订单不存在' });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: '回复失败' });
+  }
+});
+
 // PUT /api/orders/:id/status — 更新状态
 router.put('/:id/status', (req, res) => {
   try {

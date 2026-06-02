@@ -23,6 +23,7 @@ db.exec(`
     meal_type TEXT NOT NULL,
     note TEXT DEFAULT '',
     reply TEXT DEFAULT '',
+    user_reply TEXT DEFAULT '',
     status TEXT DEFAULT 'pending',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
@@ -34,5 +35,8 @@ db.exec(`
     quantity INTEGER DEFAULT 1
   );
 `);
+
+// 迁移：给已有 orders 表加 user_reply 列
+try { db.exec("ALTER TABLE orders ADD COLUMN user_reply TEXT DEFAULT ''"); } catch (e) {}
 
 module.exports = db;
