@@ -45,6 +45,5 @@ async function initDB() {
 }
 
 // 初始化并导出
-initDB().catch(console.error);
-
 module.exports = db;
+module.exports.initDB = initDB;
