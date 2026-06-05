@@ -2,7 +2,7 @@ const { createClient } = require('@libsql/client');
 
 // 优先使用 Turso 云数据库，否则用本地 SQLite
 const TURSO_URL = process.env.TURSO_URL;
-const TURSO_TOKEN = process.env.TURSO_TOKEN;
+const TURSO_TOKEN = (process.env.TURSO_TOKEN || '').trim();
 
 const db = createClient(
   TURSO_URL
@@ -47,3 +47,4 @@ async function initDB() {
 // 初始化并导出
 module.exports = db;
 module.exports.initDB = initDB;
+
