@@ -1,42 +1,50 @@
-const Database = require('better-sqlite3');
-const path = require('path');
+const { createClient } = require('@libsql/client');
 
-const dbPath = process.env.DB_PATH || path.join(__dirname, 'meal.db');
-const db = new Database(dbPath);
+// 优先使用 Turso 云数据库，否则用本地 SQLite
+const TURSO_URL = process.env.TURSO_URL;
+const TURSO_TOKEN = process.env.TURSO_TOKEN;
 
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+const db = createClient(
+  TURSO_URL
+    ? { url: TURSO_URL, authToken: TURSO_TOKEN }
+    : { url: 'file:meal.db' }
+);
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS dishes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    description TEXT DEFAULT '',
-    category TEXT DEFAULT '荤菜',
-    image TEXT DEFAULT '',
-    available INTEGER DEFAULT 1,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
+// 初始化表结构
+async function initDB() {
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS dishes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      category TEXT DEFAULT '荤菜',
+      image TEXT DEFAULT '',
+      available INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS orders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      meal_type TEXT NOT NULL,
+      note TEXT DEFAULT '',
+      reply TEXT DEFAULT '',
+      user_reply TEXT DEFAULT '',
+      status TEXT DEFAULT 'pending',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS order_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+      dish_id INTEGER NOT NULL REFERENCES dishes(id) ON DELETE CASCADE,
+      quantity INTEGER DEFAULT 1
+    )
+  `);
+}
 
-  CREATE TABLE IF NOT EXISTS orders (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    meal_type TEXT NOT NULL,
-    note TEXT DEFAULT '',
-    reply TEXT DEFAULT '',
-    user_reply TEXT DEFAULT '',
-    status TEXT DEFAULT 'pending',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS order_items (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-    dish_id INTEGER NOT NULL REFERENCES dishes(id) ON DELETE CASCADE,
-    quantity INTEGER DEFAULT 1
-  );
-`);
-
-// 迁移：给已有 orders 表加 user_reply 列
-try { db.exec("ALTER TABLE orders ADD COLUMN user_reply TEXT DEFAULT ''"); } catch (e) {}
+// 初始化并导出
+initDB().catch(console.error);
 
 module.exports = db;
