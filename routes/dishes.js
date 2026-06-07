@@ -6,24 +6,21 @@ const db = require('../db');
 
 const router = express.Router();
 
-const uploadsDir = path.join(__dirname, '..', 'uploads');
-fs.mkdirSync(uploadsDir, { recursive: true });
-
-const storage = multer.diskStorage({
-  destination: uploadsDir,
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
-  }
-});
+// 使用内存存储，不写磁盘
 const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 3 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) cb(null, true);
     else cb(new Error('只能上传图片'));
   }
 });
+
+// 图片转 Base64 data URL
+function fileToDataUrl(file) {
+  if (!file) return '';
+  return `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+}
 
 // GET /api/dishes
 router.get('/', async (req, res) => {
@@ -60,7 +57,7 @@ router.post('/', upload.single('image'), async (req, res) => {
   try {
     const { name, description = '', category = '荤菜' } = req.body;
     if (!name || !name.trim()) return res.status(400).json({ error: '菜名不能为空' });
-    const image = req.file ? `/uploads/${req.file.filename}` : '';
+    const image = fileToDataUrl(req.file);
     const result = await db.execute({
       sql: 'INSERT INTO dishes (name, description, category, image) VALUES (?, ?, ?, ?)',
       args: [name.trim(), description, category, image]
@@ -83,7 +80,7 @@ router.put('/:id', upload.single('image'), async (req, res) => {
     if (!existing.rows.length) return res.status(404).json({ error: '菜品不存在' });
 
     const dish = existing.rows[0];
-    const image = req.file ? `/uploads/${req.file.filename}` : dish.image;
+    const image = req.file ? fileToDataUrl(req.file) : dish.image;
     await db.execute({
       sql: 'UPDATE dishes SET name = ?, description = ?, category = ?, image = ?, available = ? WHERE id = ?',
       args: [name ?? dish.name, description ?? dish.description, category ?? dish.category, image, available ?? dish.available, req.params.id]
@@ -99,7 +96,7 @@ router.put('/:id', upload.single('image'), async (req, res) => {
 router.post('/:id/image', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: '没有图片' });
-    const image = `/uploads/${req.file.filename}`;
+    const image = fileToDataUrl(req.file);
     const result = await db.execute({
       sql: 'UPDATE dishes SET image = ? WHERE id = ?',
       args: [image, req.params.id]
