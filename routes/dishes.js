@@ -27,11 +27,11 @@ router.get('/', async (req, res) => {
     let result;
     if (category) {
       result = await db.execute({
-        sql: 'SELECT * FROM dishes WHERE available = 1 AND category = ? ORDER BY id',
+        sql: 'SELECT id, name, description, category, available, created_at FROM dishes WHERE available = 1 AND category = ? ORDER BY id',
         args: [category]
       });
     } else {
-      result = await db.execute('SELECT * FROM dishes WHERE available = 1 ORDER BY id');
+      result = await db.execute('SELECT id, name, description, category, available, created_at FROM dishes WHERE available = 1 ORDER BY id');
     }
     res.json(result.rows);
   } catch (e) {
@@ -40,13 +40,27 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /api/dishes/all
+// GET /api/dishes/all — 管理用，不含图片（图片太大）
 router.get('/all', async (req, res) => {
   try {
-    const result = await db.execute('SELECT * FROM dishes ORDER BY id');
-    res.json(result.rows);
+    const result = await db.execute('SELECT id, name, description, category, image, available, created_at FROM dishes ORDER BY id');
+    // 标记是否有图片（不返回实际 base64）
+    res.json(result.rows.map(r => ({ ...r, hasImage: !!(r.image && r.image.length > 10), image: undefined })));
   } catch (e) {
     res.status(500).json({ error: '获取菜品失败' });
+  }
+});
+
+// GET /api/dishes/:id/image — 获取单个菜品图片
+router.get('/:id/image', async (req, res) => {
+  try {
+    const result = await db.execute({ sql: 'SELECT image FROM dishes WHERE id = ?', args: [req.params.id] });
+    if (!result.rows.length || !result.rows[0].image) {
+      return res.status(404).json({ error: '图片不存在' });
+    }
+    res.json({ image: result.rows[0].image });
+  } catch (e) {
+    res.status(500).json({ error: '获取图片失败' });
   }
 });
 
