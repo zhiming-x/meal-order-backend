@@ -14,19 +14,10 @@ const upload = multer({
   }
 });
 
-// 上传到 Telegraph 图床（免费、无需key、永久链接）
-async function uploadToTelegraph(buffer, filename) {
-  const blob = new Blob([buffer], { type: 'image/jpeg' });
-  const formData = new FormData();
-  formData.append('file', blob, filename);
-
-  const res = await fetch('https://telegra.ph/upload', {
-    method: 'POST',
-    body: formData
-  });
-  const data = await res.json();
-  if (data.error) throw new Error(data.error);
-  return 'https://telegra.ph' + data[0].src;
+// 图片转 Base64 data URL
+function fileToDataUrl(file) {
+  if (!file) return '';
+  return `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
 }
 
 // GET /api/dishes
@@ -67,7 +58,7 @@ router.post('/', upload.single('image'), async (req, res) => {
 
     let image = '';
     if (req.file) {
-      image = await uploadToTelegraph(req.file.buffer, `${Date.now()}.jpg`);
+      image = fileToDataUrl(req.file);
     }
 
     const result = await db.execute({
@@ -94,7 +85,7 @@ router.put('/:id', upload.single('image'), async (req, res) => {
     const dish = existing.rows[0];
     let image = dish.image;
     if (req.file) {
-      image = await uploadToTelegraph(req.file.buffer, `${Date.now()}.jpg`);
+      image = fileToDataUrl(req.file);
     }
 
     await db.execute({
@@ -112,7 +103,7 @@ router.put('/:id', upload.single('image'), async (req, res) => {
 router.post('/:id/image', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: '没有图片' });
-    const image = await uploadToTelegraph(req.file.buffer, `${Date.now()}.jpg`);
+    const image = fileToDataUrl(req.file);
     const result = await db.execute({
       sql: 'UPDATE dishes SET image = ? WHERE id = ?',
       args: [image, req.params.id]
