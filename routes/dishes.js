@@ -1,25 +1,32 @@
 const express = require('express');
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 const db = require('../db');
 
 const router = express.Router();
 
-// 使用内存存储，不写磁盘
+// 内存存储
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 3 * 1024 * 1024 },
+  limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) cb(null, true);
     else cb(new Error('只能上传图片'));
   }
 });
 
-// 图片转 Base64 data URL
-function fileToDataUrl(file) {
-  if (!file) return '';
-  return `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+// 上传到 Telegraph 图床（免费、无需key、永久链接）
+async function uploadToTelegraph(buffer, filename) {
+  const blob = new Blob([buffer], { type: 'image/jpeg' });
+  const formData = new FormData();
+  formData.append('file', blob, filename);
+
+  const res = await fetch('https://telegra.ph/upload', {
+    method: 'POST',
+    body: formData
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return 'https://telegra.ph' + data[0].src;
 }
 
 // GET /api/dishes
@@ -57,7 +64,12 @@ router.post('/', upload.single('image'), async (req, res) => {
   try {
     const { name, description = '', category = '荤菜' } = req.body;
     if (!name || !name.trim()) return res.status(400).json({ error: '菜名不能为空' });
-    const image = fileToDataUrl(req.file);
+
+    let image = '';
+    if (req.file) {
+      image = await uploadToTelegraph(req.file.buffer, `${Date.now()}.jpg`);
+    }
+
     const result = await db.execute({
       sql: 'INSERT INTO dishes (name, description, category, image) VALUES (?, ?, ?, ?)',
       args: [name.trim(), description, category, image]
@@ -80,7 +92,11 @@ router.put('/:id', upload.single('image'), async (req, res) => {
     if (!existing.rows.length) return res.status(404).json({ error: '菜品不存在' });
 
     const dish = existing.rows[0];
-    const image = req.file ? fileToDataUrl(req.file) : dish.image;
+    let image = dish.image;
+    if (req.file) {
+      image = await uploadToTelegraph(req.file.buffer, `${Date.now()}.jpg`);
+    }
+
     await db.execute({
       sql: 'UPDATE dishes SET name = ?, description = ?, category = ?, image = ?, available = ? WHERE id = ?',
       args: [name ?? dish.name, description ?? dish.description, category ?? dish.category, image, available ?? dish.available, req.params.id]
@@ -96,7 +112,7 @@ router.put('/:id', upload.single('image'), async (req, res) => {
 router.post('/:id/image', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: '没有图片' });
-    const image = fileToDataUrl(req.file);
+    const image = await uploadToTelegraph(req.file.buffer, `${Date.now()}.jpg`);
     const result = await db.execute({
       sql: 'UPDATE dishes SET image = ? WHERE id = ?',
       args: [image, req.params.id]
@@ -104,6 +120,7 @@ router.post('/:id/image', upload.single('image'), async (req, res) => {
     if (result.rowsAffected === 0) return res.status(404).json({ error: '菜品不存在' });
     res.json({ ok: true, image });
   } catch (e) {
+    console.error('upload image error:', e);
     res.status(500).json({ error: '上传图片失败' });
   }
 });
